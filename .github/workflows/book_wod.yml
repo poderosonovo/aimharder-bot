@@ -31,6 +31,8 @@ jobs:
         env:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           # Hora a la que se abren las reservas en hora local de Madrid
           TARGET_HOUR_GMT1: 20
           TARGET_MINUTE: 0
