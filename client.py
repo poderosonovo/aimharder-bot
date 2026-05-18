@@ -14,6 +14,13 @@ class AimHarderClient:
         self.box_name = box_name
         self.box_id = box_id
         self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+            ),
+            "X-Requested-With": "XMLHttpRequest",
+        })
         self._login(email, password)
 
     def _base_url(self) -> str:
