@@ -52,6 +52,8 @@ class AimHarderClient:
             raise RuntimeError(f"Login HTTP error {resp.status_code}")
 
         text = resp.text
+        print(f"🔍 DEBUG Login Response Text: {text[:500]}") # Print first 500 chars
+
         if "Too many wrong attempts" in text:
             raise TooManyWrongAttempts("Login failed: too many wrong attempts")
         if "Incorrect credentials" in text or "Contraseña incorrecta" in text:
