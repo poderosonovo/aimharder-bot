@@ -1,11 +1,6 @@
 name: Book WOD Classes
 
 on:
-  schedule:
-    # El bot se levanta 1 hora antes (19:00 hora Madrid) y espera exactamente a las 20:00
-    # Domingo (0), Lunes (1), Miércoles (3)
-    - cron: "0 18 * 1,2,11,12 0,1,3"    # Invierno (Nov-Feb): 18:00 UTC = 19:00 CET  (UTC+1)
-    - cron: "0 17 * 3-10 0,1,3"         # Verano (Mar-Oct): 17:00 UTC = 19:00 CEST (UTC+2)
   workflow_dispatch:              # Opción para ejecutarlo a mano desde GitHub Actions
     inputs:
       dry_run:
