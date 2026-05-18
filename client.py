@@ -30,6 +30,7 @@ class AimHarderClient:
         return date.strftime("%Y%m%d")
 
     def _login(self, email: str, password: str):
+        login_url = f"{self._base_url()}/login"
         payload = {
             "login": "Log in",
             "mail": email,
@@ -37,8 +38,8 @@ class AimHarderClient:
         }
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": LOGIN_URL.rstrip("/"),
-            "Referer": LOGIN_URL,
+            "Origin": self._base_url(),
+            "Referer": login_url,
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
@@ -46,7 +47,7 @@ class AimHarderClient:
             "X-Requested-With": "XMLHttpRequest",
         }
 
-        resp = self.session.post(LOGIN_URL, data=payload, headers=headers, allow_redirects=True)
+        resp = self.session.post(login_url, data=payload, headers=headers, allow_redirects=True)
 
         if not resp.ok:
             raise RuntimeError(f"Login HTTP error {resp.status_code}")
