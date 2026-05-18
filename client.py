@@ -1,13 +1,11 @@
 import json
-import re
 from datetime import datetime
-from typing import Optional, Union
+from typing import Union
 
 import requests
 
 from exceptions import IncorrectCredentials, TooManyWrongAttempts, BookingFailed
 
-LOGIN_URL = "https://login.aimharder.com/"
 
 class AimHarderClient:
     def __init__(self, email: str, password: str, box_name: str, box_id: int):
@@ -34,44 +32,29 @@ class AimHarderClient:
         payload = {
             "username": email,
             "password": password,
-            "fingerprint": "123456" # AimHarder requires a fingerprint string
+            "fingerprint": "123456",
         }
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Origin": "https://login.aimharder.com",
             "Referer": "https://login.aimharder.com/",
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-            ),
         }
 
         resp = self.session.post(login_url, json=payload, headers=headers, allow_redirects=True)
-        
-        try:
-            data = resp.json()
-            print(f"🔍 DEBUG Login Success JSON: {data}")
-        except Exception as e:
-            print(f"🔍 DEBUG Login Response Text: {resp.text[:500]}")
-            
+
         if not resp.ok:
-            raise RuntimeError(f"Login HTTP error {resp.status_code}")
+            try:
+                data = resp.json()
+                msg = data.get("error", {}).get("message", resp.text[:200])
+            except Exception:
+                msg = resp.text[:200]
+            if "LOGIN_ERROR_LOGIN" in msg:
+                raise IncorrectCredentials("Login failed: incorrect credentials")
+            raise RuntimeError(f"Login HTTP error {resp.status_code}: {msg}")
 
-        # After logging in to login.aimharder.com, we must visit the box's subdomain 
-        # so that it registers the SSO/session on that specific subdomain.
+        # Visit the box's subdomain so AimHarder registers the session there
         self.session.get(self._base_url(), allow_redirects=True)
-        
-        cookies = self.session.cookies.get_dict()
-        print(f"🔍 DEBUG Cookies after login: {cookies}")
-        
-        if self.box_name in resp.url:
-            return
-            
-        if "PHPSESSID" in cookies or any("aim" in c.lower() for c in cookies):
-            return
-
-        raise RuntimeError(f"Login failed. Final URL: {resp.url}")
 
     def list_classes(self, date: datetime) -> list[dict]:
         url = f"{self._base_url()}/api/bookings"
@@ -140,7 +123,6 @@ class AimHarderClient:
         except json.JSONDecodeError:
             return {"raw": resp.text}
 
-
     def logout(self):
         try:
             self.session.get(
@@ -152,5 +134,3 @@ class AimHarderClient:
         except Exception:
             pass
         self.session.cookies.clear()
-
-
