@@ -1,6 +1,8 @@
 name: Book WOD Classes
 
 on:
+  repository_dispatch:            # Disparado por Cloudflare Worker (sin token en cron-job.org)
+    types: [book-wod]
   workflow_dispatch:              # Opción para ejecutarlo a mano desde GitHub Actions
     inputs:
       dry_run:
@@ -65,7 +67,7 @@ jobs:
               CMD="$CMD --skip-wait"
             fi
           else
-            # Si se dispara automáticamente por cron, siempre reserva para mañana
+            # Si se dispara via repository_dispatch (Cloudflare Worker) o cron
             CMD="$CMD --days-ahead 1"
           fi
           
