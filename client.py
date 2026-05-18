@@ -57,10 +57,16 @@ class AimHarderClient:
         if "Incorrect credentials" in text or "Contraseña incorrecta" in text:
             raise IncorrectCredentials("Login failed: incorrect credentials")
 
+        # After logging in to login.aimharder.com, we must visit the box's subdomain 
+        # so that it registers the SSO/session on that specific subdomain.
+        self.session.get(self._base_url(), allow_redirects=True)
+        
+        cookies = self.session.cookies.get_dict()
+        print(f"🔍 DEBUG Cookies after login: {cookies}")
+        
         if self.box_name in resp.url:
             return
             
-        cookies = self.session.cookies.get_dict()
         if "PHPSESSID" in cookies or any("aim" in c.lower() for c in cookies):
             return
 
