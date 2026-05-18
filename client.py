@@ -30,35 +30,33 @@ class AimHarderClient:
         return date.strftime("%Y%m%d")
 
     def _login(self, email: str, password: str):
-        login_url = f"{self._base_url()}/login"
+        login_url = "https://login.aimharder.com/api/login"
         payload = {
-            "login": "Log in",
-            "mail": email,
-            "pw": password,
+            "username": email,
+            "password": password,
+            "fingerprint": "123456" # AimHarder requires a fingerprint string
         }
         headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Origin": self._base_url(),
-            "Referer": login_url,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Origin": "https://login.aimharder.com",
+            "Referer": "https://login.aimharder.com/",
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
             ),
-            "X-Requested-With": "XMLHttpRequest",
         }
 
-        resp = self.session.post(login_url, data=payload, headers=headers, allow_redirects=True)
-
+        resp = self.session.post(login_url, json=payload, headers=headers, allow_redirects=True)
+        
+        try:
+            data = resp.json()
+            print(f"🔍 DEBUG Login Success JSON: {data}")
+        except Exception as e:
+            print(f"🔍 DEBUG Login Response Text: {resp.text[:500]}")
+            
         if not resp.ok:
             raise RuntimeError(f"Login HTTP error {resp.status_code}")
-
-        text = resp.text
-        print(f"🔍 DEBUG Login Response Text: {text[:500]}") # Print first 500 chars
-
-        if "Too many wrong attempts" in text:
-            raise TooManyWrongAttempts("Login failed: too many wrong attempts")
-        if "Incorrect credentials" in text or "Contraseña incorrecta" in text:
-            raise IncorrectCredentials("Login failed: incorrect credentials")
 
         # After logging in to login.aimharder.com, we must visit the box's subdomain 
         # so that it registers the SSO/session on that specific subdomain.
