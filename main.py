@@ -205,11 +205,12 @@ def main():
     parser.add_argument("--skip-wait", action="store_true", help="Skip waiting for target time (for testing)")
     parser.add_argument("--box-name", type=str, default=None, help="Optional override for box name (subdomain)")
     parser.add_argument("--box-id", type=int, default=None, help="Optional override for box ID")
-    # TARGET_HOUR_GMT1: booking open hour in GMT+1 / Madrid local time (Europe/Madrid).
-    # Falls back to TARGET_HOUR for backwards compatibility.
-    _default_hour = int(os.environ.get("TARGET_HOUR_GMT1", os.environ.get("TARGET_HOUR", 18)))
-    parser.add_argument("--target-hour", type=int, default=_default_hour, help="Target hour in Madrid time (0-23) to trigger booking, default: 18")
-    parser.add_argument("--target-minute", type=int, default=int(os.environ.get("TARGET_MINUTE", 30)), help="Target minute to run (0-59), default: 30")
+    # --target-hour / --target-minute: override the auto-calculated booking window.
+    # If not provided, the booking window is derived from the class time in the schedule:
+    #   booking_hour = class_hour + 2  (reservations open 22h before the class)
+    #   booking_minute = class_minute
+    parser.add_argument("--target-hour", type=int, default=None, help="Override: target hour in Madrid time (0-23). If not set, derived from schedule class time + 2h.")
+    parser.add_argument("--target-minute", type=int, default=None, help="Override: target minute (0-59). If not set, derived from schedule class minute.")
     parser.add_argument("--update-status", action="store_true", help="Just update the booking status JSON and exit")
     args = parser.parse_args()
     
@@ -261,7 +262,16 @@ def main():
 
 
     if day_schedule:
-        wait_until_target_time(args.target_hour, args.target_minute, skip_wait=args.skip_wait)
+        class_time_str = day_schedule.get("time")
+        if not class_time_str:
+            print(f"❌ Schedule entry for {day_name} is missing 'time' field.")
+            sys.exit(1)
+        class_hour, class_minute = map(int, class_time_str.split(":"))
+        # Reservations open 22h before the class = class_time + 2h on the previous day
+        booking_hour = args.target_hour if args.target_hour is not None else (class_hour + 2) % 24
+        booking_minute = args.target_minute if args.target_minute is not None else class_minute
+        print(f"⏰ Booking window opens at {booking_hour:02d}:{booking_minute:02d} Madrid time (class at {class_time_str})")
+        wait_until_target_time(booking_hour, booking_minute, skip_wait=args.skip_wait)
     else:
         print(f"ℹ️ No classes scheduled for {day_name}.")
         return

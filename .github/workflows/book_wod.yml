@@ -1,7 +1,10 @@
 name: Book WOD Classes
 
 on:
-  workflow_dispatch:              # Opción para ejecutarlo a mano desde GitHub Actions
+  # Cron configurado para Domingo, Lunes y Miércoles a las 19:50 (Europe/Madrid)
+  # https://console.cron-job.org/jobs
+
+  workflow_dispatch:
     inputs:
       dry_run:
         description: 'Dry Run (simular, no reservar)'
@@ -44,9 +47,6 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # Hora a la que se abren las reservas en hora local de Madrid
-          TARGET_HOUR_GMT1: 20
-          TARGET_MINUTE: 0
         run: |
           echo "🚀 Ejecutando bot de reservas..."
           
