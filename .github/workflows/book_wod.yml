@@ -1,8 +1,6 @@
 name: Book WOD Classes
 
 on:
-  repository_dispatch:            # Disparado por cron-job.org con fine-grained token (Contents:Write)
-    types: [book-wod]
   workflow_dispatch:              # Opción para ejecutarlo a mano desde GitHub Actions
     inputs:
       dry_run:
