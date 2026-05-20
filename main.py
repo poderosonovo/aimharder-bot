@@ -187,6 +187,10 @@ def process_booking(client: AimHarderClient, class_info: dict, target_date: date
         if book_state == 1:
             print_and_notify_booking(client.box_name, class_name, display_time, full_date_str, "CONFIRMED")
             return True
+        elif book_state == -2:
+            reason = "No te quedan tokens suficientes esta semana"
+            print_and_notify_booking(client.box_name, class_name, display_time, full_date_str, "FAILED", reason)
+            return False
         elif book_state == -8:
             # Already registered in another class of the same type today (only 1 allowed per day).
             reason = "Ya estás apuntado a otra clase del mismo tipo ese día (solo se permite una por día)."
