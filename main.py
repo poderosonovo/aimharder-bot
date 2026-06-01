@@ -28,7 +28,7 @@ def wait_until_target_time(target_hour: int, target_minute: int, skip_wait: bool
     """
     Wait until the target booking time (e.g. 12:00 Madrid).
     Handles both winter (UTC+1) and summer (UTC+2) automatically.
-    Sleeps 1s past the target so the booking window is guaranteed to be open.
+    Uses high-precision polling in the final seconds to book as fast as possible.
     """
     if skip_wait:
         print("⏩ Skipping wait (--skip-wait flag set)")
@@ -50,23 +50,36 @@ def wait_until_target_time(target_hour: int, target_minute: int, skip_wait: bool
     print(f"⏳ Target time: {target.strftime('%H:%M:%S')}")
     print(f"⏳ Waiting {wait_seconds:.0f} seconds ({wait_seconds/60:.1f} minutes)...")
 
-    # Wait in chunks to show progress
+    # Main wait loop (slow polling)
     while True:
         now = datetime.now(tz)
         remaining = (target - now).total_seconds()
 
-        if remaining <= 0:
-            # Sleep 1s past the target so the booking window is open
-            time.sleep(1)
-            print("✅ Target time reached! Proceeding with booking...")
+        # If less than 5 seconds remain, switch to high-precision mode
+        if remaining <= 5:
             break
 
-        # Sleep for min(30 seconds, remaining time)
-        sleep_time = min(30, remaining)
+        # Sleep up to 30 seconds, but leave at least 5 seconds buffer
+        sleep_time = min(30, remaining - 5)
         time.sleep(sleep_time)
 
-        if remaining > 30:
+        # Update remaining time after sleep to print progress
+        now = datetime.now(tz)
+        remaining = (target - now).total_seconds()
+        if remaining > 5:
             print(f"   ⏳ {remaining:.0f}s remaining...")
+
+    # High-precision polling (last 5 seconds)
+    print("⚡ Entering high-precision countdown mode (polling every 50ms)...")
+    while True:
+        now = datetime.now(tz)
+        if now >= target:
+            # Ultra-short safety sleep of 100ms instead of 1000ms (1s)
+            time.sleep(0.1)
+            print("✅ Target time reached! Proceeding with booking...")
+            break
+        # Sleep for a very short duration (50ms) to check frequently
+        time.sleep(0.05)
 
 
 
