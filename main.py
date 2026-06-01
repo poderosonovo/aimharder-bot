@@ -254,11 +254,61 @@ def main():
         print(f"❌ Invalid JSON in schedule file: {e}")
         sys.exit(1)
     
-    # Use metadata from JSON if available, otherwise use overrides/defaults
+    # Determine target date
+    tz = pytz.timezone(TIMEZONE)
+    now = datetime.now(tz)
+    target_date = now + timedelta(days=args.days_ahead)
+    day_name = target_date.strftime("%A")
+    
+    print(f"📅 Target date: {target_date.strftime('%Y-%m-%d')} ({day_name})")
+    
+    # Check schedule
+    day_schedule = box.get(day_name)
+    print(f"📅 day_schedule:", day_schedule)
+
+    if not day_schedule:
+        print(f"ℹ️ No classes scheduled for {day_name}.")
+        return
+
+    class_time_str = day_schedule.get("time")
+    if not class_time_str:
+        print(f"❌ Schedule entry for {day_name} is missing 'time' field.")
+        sys.exit(1)
+
+    class_hour, class_minute = map(int, class_time_str.split(":"))
+    # Reservations open 22h before the class = class_time + 2h on the previous day
+    booking_hour = args.target_hour if args.target_hour is not None else (class_hour + 2) % 24
+    booking_minute = args.target_minute if args.target_minute is not None else class_minute
+
+    # 1. Passive waiting (without active session) if we are more than 2 minutes away
+    target_time_dt = now.replace(hour=booking_hour, minute=booking_minute, second=0, microsecond=0)
+    if now < target_time_dt and not args.skip_wait:
+        wait_seconds = (target_time_dt - now).total_seconds()
+        if wait_seconds > 120:
+            pre_wait = wait_seconds - 120
+            print(f"⏰ Booking window opens at {booking_hour:02d}:{booking_minute:02d} Madrid time.")
+            print(f"⏳ Waiting passively for {pre_wait:.0f} seconds until preparation phase (2 minutes before target)...")
+            
+            while True:
+                now = datetime.now(tz)
+                remaining_prep = (target_time_dt - now).total_seconds() - 120
+                if remaining_prep <= 0:
+                    break
+                sleep_time = min(30, remaining_prep)
+                time.sleep(sleep_time)
+                
+                # Print progress update
+                now = datetime.now(tz)
+                remaining_prep = (target_time_dt - now).total_seconds() - 120
+                if remaining_prep > 0:
+                    print(f"   ⏳ {remaining_prep + 120:.0f}s remaining before preparation...")
+
+    # 2. Preparation phase: Initialize client and pre-load target class ID
     box_id = box.get("id") or args.box_id or int(os.environ.get("BOX_ID", 0)) or DEFAULT_BOX_ID
     box_name = box.get("name") or args.box_name or os.environ.get("BOX_NAME") or DEFAULT_BOX_NAME
     box_id = int(box_id)
 
+    print("\n🔑 [Preparation Phase] Initializing client and logging in...")
     try:
         client = AimHarderClient(email, password, box_name, box_id)
     except Exception as e:
@@ -269,43 +319,13 @@ def main():
         # Assuming update_booking_status was defined somewhere or ignored
         # update_booking_status(client.session, box, box_name, box_id)
         return
-    
-    # Determine target date
-    tz = pytz.timezone(TIMEZONE)
-    now = datetime.now(tz)
-    target_date = now + timedelta(days=args.days_ahead)
-    day_name = target_date.strftime("%A")
-    
-    print(f"📅 Target date: {target_date.strftime('%Y-%m-%d')} ({day_name})")
-    
-    # Check if we should wait
-    day_schedule = box.get(day_name)
-    print(f"📅 day_schedule:" ,day_schedule)
 
-
-    if day_schedule:
-        class_time_str = day_schedule.get("time")
-        if not class_time_str:
-            print(f"❌ Schedule entry for {day_name} is missing 'time' field.")
-            sys.exit(1)
-        class_hour, class_minute = map(int, class_time_str.split(":"))
-        # Reservations open 22h before the class = class_time + 2h on the previous day
-        booking_hour = args.target_hour if args.target_hour is not None else (class_hour + 2) % 24
-        booking_minute = args.target_minute if args.target_minute is not None else class_minute
-        print(f"⏰ Booking window opens at {booking_hour:02d}:{booking_minute:02d} Madrid time (class at {class_time_str})")
-        wait_until_target_time(booking_hour, booking_minute, skip_wait=args.skip_wait)
-    else:
-        print(f"ℹ️ No classes scheduled for {day_name}.")
-        return
-
-    # Process booking
-    print(f"\n🚀 Processing Box: {box_name} (ID: {box_id})")
-    
+    print(f"🚀 Processing Box: {box_name} (ID: {box_id})")
     target_time = day_schedule.get("time")
     target_class = day_schedule.get("class_name")
-    
-    print(f"🎯 Target: {target_class} at {target_time}")
-    
+    print(f"🎯 Target class: {target_class} at {target_time}")
+
+    print("Fetching classes to pre-load target class ID...")
     try:
         classes = client.list_classes(target_date)
     except Exception as e:
@@ -326,9 +346,12 @@ def main():
     if matching_class.get("_is_already_booked"):
         print(f"ℹ️ Skipping booking: Already booked.")
         return
-        
 
-    # Book the class
+    # 3. Final High-Precision Countdown Phase
+    print(f"\n⏰ Booking window opens at {booking_hour:02d}:{booking_minute:02d} Madrid time.")
+    wait_until_target_time(booking_hour, booking_minute, skip_wait=args.skip_wait)
+
+    # 4. Instant booking (zero overhead)
     success = process_booking(client, matching_class, target_date, dry_run=args.dry_run)
 
     if success:
