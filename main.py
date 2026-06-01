@@ -24,11 +24,18 @@ from client import AimHarderClient
 from exceptions import BookingFailed, IncorrectCredentials, TooManyWrongAttempts
 
 
-def wait_until_target_time(target_hour: int, target_minute: int, skip_wait: bool = False) -> None:
+def wait_until_target_time(
+    target_hour: int,
+    target_minute: int,
+    skip_wait: bool = False,
+    buffer_seconds: float = 0.0
+) -> None:
     """
     Wait until the target booking time (e.g. 12:00 Madrid).
     Handles both winter (UTC+1) and summer (UTC+2) automatically.
-    Uses high-precision polling in the final seconds to book as fast as possible.
+    
+    If buffer_seconds > 0, waits passively until buffer_seconds remain before the target (used for preparation phase).
+    If buffer_seconds == 0, waits until the exact target time using high-precision polling in the final seconds.
     """
     if skip_wait:
         print("⏩ Skipping wait (--skip-wait flag set)")
@@ -40,36 +47,55 @@ def wait_until_target_time(target_hour: int, target_minute: int, skip_wait: bool
     # Create target time for today
     target = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
 
-    # If we're past target time, no need to wait
-    if now >= target:
-        print(f"⏰ Current time ({now.strftime('%H:%M:%S')}) is past target ({target.strftime('%H:%M')}). Proceeding immediately.")
+    # Calculate actual target considering the buffer
+    effective_target = target - timedelta(seconds=buffer_seconds)
+
+    # If we're past the effective target time, no need to wait
+    if now >= effective_target:
+        if buffer_seconds > 0:
+            print(f"⏰ Current time is already within the {buffer_seconds}s preparation window. Proceeding to preparation immediately.")
+        else:
+            print(f"⏰ Current time ({now.strftime('%H:%M:%S')}) is past target ({target.strftime('%H:%M')}). Proceeding immediately.")
         return
 
-    wait_seconds = (target - now).total_seconds()
-    print(f"⏳ Current Madrid time: {now.strftime('%H:%M:%S')}")
-    print(f"⏳ Target time: {target.strftime('%H:%M:%S')}")
-    print(f"⏳ Waiting {wait_seconds:.0f} seconds ({wait_seconds/60:.1f} minutes)...")
+    wait_seconds = (effective_target - now).total_seconds()
+    
+    if buffer_seconds > 0:
+        print(f"⏰ Booking window opens at {target_hour:02d}:{target_minute:02d} Madrid time.")
+        print(f"⏳ Waiting passively for {wait_seconds:.0f} seconds until preparation phase ({buffer_seconds/60:.1f} minutes before target)...")
+    else:
+        print(f"⏳ Current Madrid time: {now.strftime('%H:%M:%S')}")
+        print(f"⏳ Target time: {target.strftime('%H:%M:%S')}")
+        print(f"⏳ Waiting {wait_seconds:.0f} seconds ({wait_seconds/60:.1f} minutes)...")
 
-    # Main wait loop (slow polling)
+    # Main wait loop (slow polling in chunks of up to 30s)
+    # If buffer_seconds == 0, we leave a 5-second buffer before switching to high-precision
+    # If buffer_seconds > 0, we go all the way down to 0 seconds relative to effective_target
+    wait_limit = 5.0 if buffer_seconds == 0 else 0.0
+
     while True:
         now = datetime.now(tz)
-        remaining = (target - now).total_seconds()
+        remaining = (effective_target - now).total_seconds()
 
-        # If less than 5 seconds remain, switch to high-precision mode
-        if remaining <= 5:
+        if remaining <= wait_limit:
             break
 
-        # Sleep up to 30 seconds, but leave at least 5 seconds buffer
-        sleep_time = min(30, remaining - 5)
+        # Sleep up to 30 seconds, leaving the defined wait_limit
+        sleep_time = min(30, remaining - wait_limit)
         time.sleep(sleep_time)
 
-        # Update remaining time after sleep to print progress
+        # Print progress update
         now = datetime.now(tz)
-        remaining = (target - now).total_seconds()
-        if remaining > 5:
-            print(f"   ⏳ {remaining:.0f}s remaining...")
+        remaining = (effective_target - now).total_seconds()
+        if remaining > wait_limit:
+            total_remaining = remaining + buffer_seconds
+            print(f"   ⏳ {total_remaining:.0f}s remaining...")
 
-    # High-precision polling (last 5 seconds)
+    # For passive waiting with a buffer, we are done
+    if buffer_seconds > 0:
+        return
+
+    # High-precision polling for the final 5 seconds (only when buffer_seconds == 0)
     print("⚡ Entering high-precision countdown mode (polling every 50ms)...")
     while True:
         now = datetime.now(tz)
@@ -281,27 +307,7 @@ def main():
     booking_minute = args.target_minute if args.target_minute is not None else class_minute
 
     # 1. Passive waiting (without active session) if we are more than 2 minutes away
-    target_time_dt = now.replace(hour=booking_hour, minute=booking_minute, second=0, microsecond=0)
-    if now < target_time_dt and not args.skip_wait:
-        wait_seconds = (target_time_dt - now).total_seconds()
-        if wait_seconds > 120:
-            pre_wait = wait_seconds - 120
-            print(f"⏰ Booking window opens at {booking_hour:02d}:{booking_minute:02d} Madrid time.")
-            print(f"⏳ Waiting passively for {pre_wait:.0f} seconds until preparation phase (2 minutes before target)...")
-            
-            while True:
-                now = datetime.now(tz)
-                remaining_prep = (target_time_dt - now).total_seconds() - 120
-                if remaining_prep <= 0:
-                    break
-                sleep_time = min(30, remaining_prep)
-                time.sleep(sleep_time)
-                
-                # Print progress update
-                now = datetime.now(tz)
-                remaining_prep = (target_time_dt - now).total_seconds() - 120
-                if remaining_prep > 0:
-                    print(f"   ⏳ {remaining_prep + 120:.0f}s remaining before preparation...")
+    wait_until_target_time(booking_hour, booking_minute, skip_wait=args.skip_wait, buffer_seconds=120.0)
 
     # 2. Preparation phase: Initialize client and pre-load target class ID
     box_id = box.get("id") or args.box_id or int(os.environ.get("BOX_ID", 0)) or DEFAULT_BOX_ID
