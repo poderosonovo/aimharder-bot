@@ -9,10 +9,7 @@
     "time": "17:00",
     "class_name": "Weightlifting"
   },
-  "Wednesday": {
-    "time": "18:00",
-    "class_name": "Hybrid Capacity"
-  },
+  "Wednesday": null,
   "Thursday": {
     "time": "18:00",
     "class_name": "WOD"
