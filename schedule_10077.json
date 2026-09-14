@@ -1,7 +1,10 @@
 {
   "id": "10077",
   "name": "fullcrossfitbenimaclet",
-  "Monday": null,
+  "Monday": {
+    "time": "18:00",
+    "class_name": "WOD"
+  },
   "Tuesday": {
     "time": "17:00",
     "class_name": "Weightlifting"
