@@ -12,6 +12,14 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 
+# Ensure UTF-8 output on Windows terminals
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
+
 import pytz
 import requests
 
@@ -245,6 +253,16 @@ def process_booking(client: AimHarderClient, class_info: dict, target_date: date
 
 
 
+def is_enabled(item: dict) -> bool:
+    """Check if an item (schedule root or day schedule) is enabled."""
+    if not isinstance(item, dict):
+        return False
+    val = item.get("enabled", True)
+    if isinstance(val, str):
+        return val.strip().lower() not in ("false", "0", "no", "off")
+    return bool(val)
+
+
 def main():
     parser = argparse.ArgumentParser(description="AimHarder Bot")
     parser.add_argument("--dry-run", action="store_true", help="Don't actually book, just show what would be booked")
@@ -262,14 +280,6 @@ def main():
     parser.add_argument("--update-status", action="store_true", help="Just update the booking status JSON and exit")
     args = parser.parse_args()
     
-    # Get credentials from environment
-    email = os.environ.get("EMAIL")
-    password = os.environ.get("PASSWORD")
-    
-    if not email or not password:
-        print("❌ Missing credentials. Set EMAIL and PASSWORD environment variables.")
-        sys.exit(1)
-    
     # Load schedule
     try:
         box = load_schedule(args.schedule)
@@ -279,6 +289,11 @@ def main():
     except json.JSONDecodeError as e:
         print(f"❌ Invalid JSON in schedule file: {e}")
         sys.exit(1)
+
+    # Check global enabled flag
+    if not is_enabled(box):
+        print(f"⏸️ Automation is globally disabled in {args.schedule}.")
+        return
     
     # Determine target date
     tz = pytz.timezone(TIMEZONE)
@@ -295,6 +310,18 @@ def main():
     if not day_schedule:
         print(f"ℹ️ No classes scheduled for {day_name}.")
         return
+
+    if not is_enabled(day_schedule):
+        print(f"⏸️ Booking for {day_name} is disabled in schedule.")
+        return
+
+    # Get credentials from environment
+    email = os.environ.get("EMAIL")
+    password = os.environ.get("PASSWORD")
+    
+    if not email or not password:
+        print("❌ Missing credentials. Set EMAIL and PASSWORD environment variables.")
+        sys.exit(1)
 
     class_time_str = day_schedule.get("time")
     if not class_time_str:

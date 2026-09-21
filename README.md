@@ -32,13 +32,17 @@ Each box is configured with its own schedule file and GitHub Actions workflow.
 Create a JSON file for your box (e.g., `schedule_10002.json`) with the following format:
 ```json
 {
+  "enabled": true,
   "id": "10002",
   "name": "boxname",
-  "Monday": { "time": "18:30", "class_name": "CrossFit" },
-  "Friday": { "time": "17:30", "class_name": "Community WOD" },
+  "Monday": { "enabled": true, "time": "18:30", "class_name": "CrossFit" },
+  "Friday": { "enabled": false, "time": "17:30", "class_name": "Community WOD" },
   ...
 }
 ```
+* Set `"enabled": false` at the root level to pause all bookings globally.
+* Set `"enabled": false` inside any individual day to temporarily skip that day without losing its configuration.
+
 
 ### 2. GitHub Actions Workflow
 Each box has its own workflow file in `.github/workflows/`. You can configure the specific booking opening time for each box using the `TARGET_HOUR` and `TARGET_MINUTE` variables:
