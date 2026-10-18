@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "id": "10077",
   "name": "fullcrossfitbenimaclet",
   "Monday": {
@@ -9,8 +9,8 @@
   },
   "Tuesday": {
     "enabled": true,
-    "time": "18:00",
-    "class_name": "WOD"
+    "time": "17:00",
+    "class_name": "Weightlifting"
   },
   "Wednesday": {
     "enabled": false,
@@ -19,7 +19,7 @@
   },
   "Thursday": {
     "enabled": true,
-    "time": "18:00",
+    "time": "19:00",
     "class_name": "WOD"
   },
   "Friday": {
